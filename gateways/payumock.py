@@ -5,6 +5,7 @@ import random
 class PayUMock(PaymentGateway):
 
     def __init__(self):
+        super().__init__("PayUMock")
         self.is_healthy=random.random()>0.8
 
     def process_payment(self,transaction: Transaction) -> bool:

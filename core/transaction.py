@@ -34,6 +34,3 @@ class Transaction:
         return (f"Tranzactia cu ID-ul : {self.transaction_id} este pe status-ul : {self.status.value}, cu data crearii"
                 f" : {self.created_at.strftime('%d-%m-%Y %H:%M:%S')}, si data actualizarii : "
                 f" {self.updated_at.strftime('%d-%m-%Y %H:%M:%S')}")
-
-    def clone(self) -> "Transaction":
-        return Transaction(self.amount,self.currency,Status.PENDING)

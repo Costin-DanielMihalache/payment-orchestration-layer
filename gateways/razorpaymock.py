@@ -4,6 +4,7 @@ import random
 
 class RazorpayMock(PaymentGateway):
     def __init__(self):
+        super().__init__("RazorpayMock")
         self.is_healthy=random.random()>0.5
 
     def process_payment(self,transaction:Transaction) -> bool:

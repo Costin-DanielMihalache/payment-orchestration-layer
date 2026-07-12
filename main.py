@@ -5,43 +5,68 @@ from gateways.payumock import PayUMock
 from gateways.upimock import UPIMock
 from core.transaction import Transaction
 from core.status import Status
+import time
 
 def check_gateway_health(gateway: PaymentGateway, transaction:Transaction) ->bool:
     if not gateway.check_health():
-        print(f"Gateway indisponibil pentru tranzactia {transaction.transaction_id}")
+        print(f"Gateway-ul {gateway.name} este indisponibil pentru tranzactia {transaction.transaction_id}!")
         return False
     return True
 
 
-def process_and_advance(gateway: PaymentGateway, transaction:Transaction,next_status:Status)->bool:
+def process_and_advance(gateway: PaymentGateway, transaction:Transaction,next_status:Status,max_attempts=3)->bool:
     if not check_gateway_health(gateway,transaction):
         return False
-    if not gateway.process_payment(transaction):
-        print(f"Procesarea platii a esuat pentru tranzactia {transaction.transaction_id}!")
+    attempts=0
+    success=False
+    while attempts<max_attempts and not success:
+        if attempts==0:
+            print(f"Se proceseaza plata ...")
+        else:
+            print(f"Procesarea platii a esuat, se reincearca din nou ...")
+        time.sleep(3)
+        success=gateway.process_payment(transaction)
+        time.sleep(1)
+        attempts+=1
+    if not success:
+        print(f"Procesarea platii a esuat definitiv dupa {attempts} incercari!")
         return False
     if not transaction.try_change_status(next_status):
-        return False
+        raise RuntimeError(f"Plata a reusit dar tranzitia de status a esuat pentru {transaction.transaction_id} - necesita interventie manuala!")
     print(transaction)
     return True
 
 def process_full_flow(gateway:PaymentGateway,transaction:Transaction,statuses:list[Status]) -> bool:
     for status in statuses:
-        if not process_and_advance(gateway,transaction,status):
-            return False
+        try:
+            if not process_and_advance(gateway,transaction,status):
+                return False
+        except RuntimeError as e:
+            print(f"EROARE CRITICA: {e}")
+            raise
     return True
 
-def test_all_gateways(gateways: list[PaymentGateway],transaction:Transaction,statuses:list[Status]):
+def process_with_failover(gateways: list[PaymentGateway], transaction: Transaction, statuses:list[Status]) -> bool:
     print(transaction)
     for gateway in gateways:
-        clone=transaction.clone()
-        if check_gateway_health(gateway,clone):
-            process_full_flow(gateway,clone,statuses)
+        if transaction.status== Status.PROCESSING:
+            transaction.try_change_status(Status.PENDING)
+        if check_gateway_health(gateway,transaction):
+            try:
+                if process_full_flow(gateway,transaction,statuses):
+                    return True
+            except RuntimeError as e:
+                print(f"Failover oprit - necesita interventie manuala: {e}")
+                return False
+    transaction.try_change_status(Status.REJECTED)
+    print(transaction)
+    return False
 
 def main():
     gateways=[RazorpayMock(),StripeMock(),PayUMock(),UPIMock()]
     t=Transaction(200,"LEU")
-    test_all_gateways(gateways,t,[Status.PROCESSING,Status.ACCEPTED])
+    process_with_failover(gateways,t,[Status.PROCESSING,Status.ACCEPTED])
     t1=Transaction(500)
-    test_all_gateways(gateways,t1,[Status.ACCEPTED,Status.PROCESSING])
+    process_with_failover(gateways,t1,[Status.ACCEPTED,Status.PROCESSING])
 if __name__ == "__main__":
     main()

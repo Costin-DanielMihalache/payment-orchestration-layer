@@ -7,8 +7,8 @@ class Status(Enum):
     REJECTED="REJECTED"
 
 VALID_TRANSITIONS={
-    Status.PENDING: [Status.PROCESSING],
-    Status.PROCESSING : [Status.ACCEPTED, Status.REJECTED],
+    Status.PENDING: [Status.PROCESSING,Status.REJECTED],
+    Status.PROCESSING : [Status.ACCEPTED, Status.REJECTED, Status.PENDING],
     Status.ACCEPTED : [],
     Status.REJECTED : []
 }

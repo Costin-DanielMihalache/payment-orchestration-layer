@@ -5,6 +5,7 @@ import random
 class StripeMock(PaymentGateway):
 
     def __init__(self):
+        super().__init__("StripeMock")
         self.is_healthy=random.random()>0.7
 
     def process_payment(self,transaction:Transaction ):
