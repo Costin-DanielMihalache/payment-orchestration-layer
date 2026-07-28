@@ -1,13 +1,12 @@
 from datetime import datetime
 import time
+import uuid
 from core.status import Status, VALID_TRANSITIONS
 
 class Transaction:
-    last_id=0
 
     def __init__(self,amount=0,currency="EUR",status:Status=Status.PENDING):
-        Transaction.last_id+=1
-        self.transaction_id=Transaction.last_id
+        self.transaction_id=str(uuid.uuid4())
         self.amount=amount
         self.currency=currency
         self.status=status
@@ -15,16 +14,16 @@ class Transaction:
         self.updated_at=datetime.now()
 
 
-    def change_status(self,new_status:Status):
+    def change_status(self,new_status:Status,delay=0.1):
         if new_status not in VALID_TRANSITIONS[self.status]:
             raise ValueError(f"Nu poti trece din {self.status} in {new_status}")
         self.status=new_status
-        time.sleep(1)
+        time.sleep(delay)
         self.updated_at=datetime.now()
 
-    def try_change_status(self,new_status:Status) -> bool:
+    def try_change_status(self,new_status:Status,delay=0.1) -> bool:
         try:
-            self.change_status(new_status)
+            self.change_status(new_status,delay=delay)
             return True
         except ValueError as e:
             print(f"Eroare la tranzactia {self.transaction_id} : {e}")
