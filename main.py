@@ -5,6 +5,7 @@ from gateways.payumock import PayUMock
 from gateways.upimock import UPIMock
 from core.transaction import Transaction
 from core.status import Status
+from core.webhook import WebhookProcessor
 import time
 
 processed_payments=set()
@@ -78,8 +79,24 @@ def sort_gateways_by_success_rate(gateways:list[PaymentGateway]) -> list[Payment
 
 def main():
     gateways=[RazorpayMock(),StripeMock(),PayUMock(),UPIMock()]
+    transactions={}
+    webhook_processor=WebhookProcessor()
     t=Transaction(200,"LEU")
-    process_with_failover(gateways,t,[Status.PROCESSING,Status.ACCEPTED])
+    transactions[t.transaction_id]=t
+    process_with_failover(gateways,t,[Status.PROCESSING])
+
+    print(f"Status inainte de webhook: {t.status}")
+
+    payload={
+        "webhook_id": "wh_100",
+        "transaction_id" : t.transaction_id,
+        "amount" : t.amount,
+        "status" : "succeeded"
+    }
+
+    webhook_processor.receive_webhook(payload,transactions)
+
+    print(f"Status dupa webhook: {t.status}")
     t1=Transaction(500)
     process_with_failover(gateways,t1,[Status.ACCEPTED,Status.PROCESSING])
 if __name__ == "__main__":
