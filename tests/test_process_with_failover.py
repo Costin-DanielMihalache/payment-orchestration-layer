@@ -1,8 +1,7 @@
-from main import process_with_failover
+from core.orchestrator import process_with_failover
 from core.transaction import Transaction
 from core.status import Status
 from tests.fake_gateway import FakeGateway
-import pytest
 
 def test_failover_reaches_third_gateway():
     gateway1=FakeGateway(name="Gateway1",healthy=False)

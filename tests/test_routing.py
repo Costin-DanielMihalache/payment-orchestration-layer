@@ -1,4 +1,4 @@
-from main import sort_gateways_by_success_rate
+from core.orchestrator import sort_gateways_by_success_rate
 from tests.fake_gateway import FakeGateway
 
 def test_sorts_gateways_by_success_rate():

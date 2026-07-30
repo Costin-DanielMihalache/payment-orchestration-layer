@@ -1,4 +1,4 @@
-from main import process_and_advance
+from core.orchestrator import process_and_advance
 from core.transaction import Transaction
 from core.status import Status
 from tests.fake_gateway import FakeGateway

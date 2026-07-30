@@ -1,5 +1,5 @@
 import time
-from main import process_with_failover
+from core.orchestrator import process_with_failover
 from core.transaction import Transaction
 from core.status import Status
 from tests.fake_gateway import FakeGateway

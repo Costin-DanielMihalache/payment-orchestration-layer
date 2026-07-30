@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from core.transaction import Transaction
+from core.breaker import CircuitBreaker,CircuitState
 
 class PaymentGateway(ABC):
 
@@ -7,6 +8,7 @@ class PaymentGateway(ABC):
         self.name=name
         self.total_attempts=0
         self.successful_attempts=0
+        self.circuit_breaker=CircuitBreaker()
 
     @property
     def success_rate(self) -> float:
