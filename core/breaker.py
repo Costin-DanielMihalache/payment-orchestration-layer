@@ -1,5 +1,8 @@
 from enum import Enum
 import time
+import logging
+
+logger=logging.getLogger(__name__)
 
 class CircuitState(Enum):
     CLOSED="closed"
@@ -8,7 +11,7 @@ class CircuitState(Enum):
 
 class CircuitBreaker:
     def __init__(self,failure_threshold=3,recovery_timeout=10):
-        self.state=CircuitState.CLOSED
+        self.state: CircuitState=CircuitState.CLOSED
         self.failure_threshold=failure_threshold
         self.recovery_timeout=recovery_timeout
         self.failure_count=0
@@ -19,14 +22,18 @@ class CircuitBreaker:
         if self.failure_count>=self.failure_threshold:
             self.state=CircuitState.OPEN
             self.opened_at=time.time()
+            logger.warning(f"Circuit breaker deschis dupa {self.failure_count} esecuri consecutive")
 
     def record_success(self):
+        if self.state!=CircuitState.CLOSED:
+            logger.info(f"Circuit breaker revine la CLOSED dupa un succes (stare anterioara: {self.state.value})")
         self.state=CircuitState.CLOSED
         self.failure_count=0
 
     def try_change_state_to_half_open(self):
         if self.state==CircuitState.OPEN and time.time()-self.opened_at>=self.recovery_timeout:
             self.state=CircuitState.HALF_OPEN
+            logger.info("Circuit breaker trece in HALF_OPEN, se testeaza gateway-ul din nou")
 
     def allow_request(self) -> bool:
         self.try_change_state_to_half_open()

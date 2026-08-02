@@ -2,6 +2,9 @@ from datetime import datetime
 import time
 import uuid
 from core.status import Status, VALID_TRANSITIONS
+import logging
+
+logger=logging.getLogger(__name__)
 
 class Transaction:
 
@@ -26,7 +29,7 @@ class Transaction:
             self.change_status(new_status,delay=delay)
             return True
         except ValueError as e:
-            print(f"Eroare la tranzactia {self.transaction_id} : {e}")
+            logger.error(f"Eroare la tranzactia {self.transaction_id} : {e}")
             return False
 
     def __str__(self):

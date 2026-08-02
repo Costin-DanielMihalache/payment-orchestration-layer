@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from core.transaction import Transaction
-from core.breaker import CircuitBreaker,CircuitState
+from core.breaker import CircuitBreaker
 
 class PaymentGateway(ABC):
 

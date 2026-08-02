@@ -2,16 +2,19 @@ from gateways.paymentgateway import PaymentGateway
 from core.transaction import Transaction
 from core.status import Status
 import time
+import logging
+
+logger=logging.getLogger(__name__)
 
 processed_payments = set()
 
 
 def check_gateway_health(gateway: PaymentGateway, transaction: Transaction) -> bool:
     if not gateway.circuit_breaker.allow_request():
-        print(f"Circuit breaker deschis pentru {gateway.name}, sarim peste")
+        logger.warning(f"Circuit breaker deschis pentru {gateway.name}, sarim peste")
         return False
     if not gateway.check_health():
-        print(f"Gateway-ul {gateway.name} este indisponibil pentru tranzactia {transaction.transaction_id}!")
+        logger.warning(f"Gateway-ul {gateway.name} este indisponibil pentru tranzactia {transaction.transaction_id}!")
         return False
     return True
 
@@ -21,15 +24,15 @@ def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_
         return False
     key = (transaction.transaction_id, gateway.name)
     if key in processed_payments:
-        print(f"Tranzactia {transaction.transaction_id} a fost deja procesata cu succes pe {gateway.name}!")
+        logger.info(f"Tranzactia {transaction.transaction_id} a fost deja procesata cu succes pe {gateway.name}!")
     else:
         attempts = 0
         success = False
         while attempts < max_attempts and not success:
             if attempts == 0:
-                print(f"Se proceseaza plata ...")
+                logger.info(f"Se proceseaza plata ...")
             else:
-                print(f"Procesarea platii a esuat, se reincearca din nou ...")
+                logger.info(f"Procesarea platii a esuat, se reincearca din nou ...")
             time.sleep(delay * 3)
             success = gateway.process_payment(transaction)
             gateway.total_attempts += 1
@@ -41,12 +44,12 @@ def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_
             time.sleep(delay)
             attempts += 1
         if not success:
-            print(f"Procesarea platii a esuat definitiv dupa {attempts} incercari!")
+            logger.error(f"Procesarea platii a esuat definitiv dupa {attempts} incercari!")
             return False
         processed_payments.add(key)
     if not transaction.try_change_status(next_status, delay=delay):
         raise RuntimeError(f"Plata a reusit dar tranzitia de status a esuat pentru {transaction.transaction_id} - necesita interventie manuala!")
-    print(transaction)
+    logger.info(transaction)
     return True
 
 
@@ -56,7 +59,7 @@ def process_full_flow(gateway: PaymentGateway, transaction: Transaction, statuse
             if not process_and_advance(gateway, transaction, status, delay=delay):
                 return False
         except RuntimeError as e:
-            print(f"EROARE CRITICA: {e}")
+            logger.error(f"EROARE CRITICA: {e}")
             raise
     return True
 
@@ -67,7 +70,7 @@ def sort_gateways_by_success_rate(gateways: list[PaymentGateway]) -> list[Paymen
 
 def process_with_failover(gateways: list[PaymentGateway], transaction: Transaction, statuses: list[Status], delay=0.1) -> bool:
     gateways = sort_gateways_by_success_rate(gateways)
-    print(transaction)
+    logger.info(transaction)
     for gateway in gateways:
         if transaction.status == Status.PROCESSING:
             transaction.try_change_status(Status.PENDING, delay=delay)
@@ -76,8 +79,8 @@ def process_with_failover(gateways: list[PaymentGateway], transaction: Transacti
                 if process_full_flow(gateway, transaction, statuses, delay=delay):
                     return True
             except RuntimeError as e:
-                print(f"Failover oprit - necesita interventie manuala: {e}")
+                logger.error(f"Failover oprit - necesita interventie manuala: {e}")
                 return False
     transaction.try_change_status(Status.REJECTED, delay=delay)
-    print(transaction)
+    logger.info(transaction)
     return False

@@ -7,17 +7,23 @@ from core.status import Status
 from core.webhook import WebhookProcessor
 from core.orchestrator import process_with_failover
 from tests.fake_gateway import FakeGateway
+from core.logging_config import setup_logging
+import logging
+
+setup_logging()
+
+logger=logging.getLogger(__name__)
 
 def demo_circuit_breaker():
-    print("\n--- Demonstratie Circuit Breaker ---")
+    logger.info("--- Demonstratie Circuit Breaker ---")
     bad_gateway=FakeGateway(name="BadGateway",healthy=True,payment_results=[False,False,False])
     t=Transaction(100,"EUR")
     process_with_failover([bad_gateway],t,[Status.PROCESSING],delay=0)
-    print(f"Starea circuit breaker-ului dupa esecuri repetate: {bad_gateway.circuit_breaker.state}")
+    logger.info(f"Starea circuit breaker-ului dupa esecuri repetate: {bad_gateway.circuit_breaker.state}")
 
     t2=Transaction(100,"EUR")
     process_with_failover([bad_gateway],t2,[Status.PROCESSING],delay=0)
-    print(f"A doua tranzactie pe acelasi gateway - a fost sarita direct? Rezultat: {t2.status}")
+    logger.info(f"A doua tranzactie pe acelasi gateway - a fost sarita direct? Rezultat: {t2.status}")
 
 def main():
     gateways=[RazorpayMock(),StripeMock(),PayUMock(),UPIMock()]
@@ -27,7 +33,7 @@ def main():
     transactions[t.transaction_id]=t
     process_with_failover(gateways,t,[Status.PROCESSING])
 
-    print(f"Status inainte de webhook: {t.status}")
+    logger.info(f"Status inainte de webhook: {t.status}")
 
     payload={
         "webhook_id": "wh_100",
@@ -38,7 +44,7 @@ def main():
 
     webhook_processor.receive_webhook(payload,transactions)
 
-    print(f"Status dupa webhook: {t.status}")
+    logger.info(f"Status dupa webhook: {t.status}")
     t1=Transaction(500)
     process_with_failover(gateways,t1,[Status.ACCEPTED,Status.PROCESSING])
     demo_circuit_breaker()

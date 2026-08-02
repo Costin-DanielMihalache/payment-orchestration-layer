@@ -1,6 +1,9 @@
 from gateways.paymentgateway import PaymentGateway
 from core.transaction import Transaction
 import random
+import logging
+
+logger=logging.getLogger(__name__)
 
 class PayUMock(PaymentGateway):
 
@@ -12,7 +15,7 @@ class PayUMock(PaymentGateway):
         if not self.is_healthy:
             return False
         success=random.random()>0.7
-        print(f"PayUMock proceseaza tranzactia cu ID-ul {transaction.transaction_id} : {'succes' if success else 'esec'}")
+        logger.info(f"PayUMock proceseaza tranzactia cu ID-ul {transaction.transaction_id} : {'succes' if success else 'esec'}")
         return success
 
     def check_health(self) -> bool:
