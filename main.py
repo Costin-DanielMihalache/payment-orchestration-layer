@@ -8,6 +8,7 @@ from core.webhook import WebhookProcessor
 from core.orchestrator import process_with_failover
 from tests.fake_gateway import FakeGateway
 from core.logging_config import setup_logging
+from core.repository import TransactionRepository
 import logging
 
 setup_logging()
@@ -29,9 +30,10 @@ def main():
     gateways=[RazorpayMock(),StripeMock(),PayUMock(),UPIMock()]
     transactions={}
     webhook_processor=WebhookProcessor()
+    repository=TransactionRepository()
     t=Transaction(200,"LEU")
     transactions[t.transaction_id]=t
-    process_with_failover(gateways,t,[Status.PROCESSING])
+    process_with_failover(gateways,t,[Status.PROCESSING],repository=repository)
 
     logger.info(f"Status inainte de webhook: {t.status}")
 

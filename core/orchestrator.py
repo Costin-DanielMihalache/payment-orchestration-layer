@@ -1,6 +1,7 @@
 from gateways.paymentgateway import PaymentGateway
 from core.transaction import Transaction
 from core.status import Status
+from core.repository import TransactionRepository
 import time
 import logging
 
@@ -19,7 +20,7 @@ def check_gateway_health(gateway: PaymentGateway, transaction: Transaction) -> b
     return True
 
 
-def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_status: Status, max_attempts=3, delay=0.1) -> bool:
+def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_status: Status, max_attempts=3, delay=0.1,repository=None) -> bool:
     if not check_gateway_health(gateway, transaction):
         return False
     key = (transaction.transaction_id, gateway.name)
@@ -49,14 +50,16 @@ def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_
         processed_payments.add(key)
     if not transaction.try_change_status(next_status, delay=delay):
         raise RuntimeError(f"Plata a reusit dar tranzitia de status a esuat pentru {transaction.transaction_id} - necesita interventie manuala!")
+    if repository:
+        repository.save(transaction)
     logger.info(transaction)
     return True
 
 
-def process_full_flow(gateway: PaymentGateway, transaction: Transaction, statuses: list[Status], delay=0.1) -> bool:
+def process_full_flow(gateway: PaymentGateway, transaction: Transaction, statuses: list[Status], delay=0.1,repository=None) -> bool:
     for status in statuses:
         try:
-            if not process_and_advance(gateway, transaction, status, delay=delay):
+            if not process_and_advance(gateway, transaction, status, delay=delay,repository=repository):
                 return False
         except RuntimeError as e:
             logger.error(f"EROARE CRITICA: {e}")
@@ -68,12 +71,16 @@ def sort_gateways_by_success_rate(gateways: list[PaymentGateway]) -> list[Paymen
     return sorted(gateways, key=lambda g: g.success_rate, reverse=True)
 
 
-def process_with_failover(gateways: list[PaymentGateway], transaction: Transaction, statuses: list[Status], delay=0.1) -> bool:
+def process_with_failover(gateways: list[PaymentGateway], transaction: Transaction, statuses: list[Status], delay=0.1,repository=None) -> bool:
     gateways = sort_gateways_by_success_rate(gateways)
     logger.info(transaction)
+    if repository:
+        repository.save(transaction)
     for gateway in gateways:
         if transaction.status == Status.PROCESSING:
             transaction.try_change_status(Status.PENDING, delay=delay)
+            if repository:
+                repository.save(transaction)
         if check_gateway_health(gateway, transaction):
             try:
                 if process_full_flow(gateway, transaction, statuses, delay=delay):
@@ -82,5 +89,7 @@ def process_with_failover(gateways: list[PaymentGateway], transaction: Transacti
                 logger.error(f"Failover oprit - necesita interventie manuala: {e}")
                 return False
     transaction.try_change_status(Status.REJECTED, delay=delay)
+    if repository:
+        repository.save(transaction)
     logger.info(transaction)
     return False

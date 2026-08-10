@@ -132,3 +132,31 @@
 2026-08-02 14:46:22,126-WARNING-core.orchestrator-Circuit breaker deschis pentru BadGateway, sarim peste
 2026-08-02 14:46:22,126-INFO-core.orchestrator-Tranzactia cu ID-ul : 3bbe0a51-44ae-4a20-944e-90beaf9eb491 este pe status-ul : REJECTED, cu data crearii : 02-08-2026 14:46:22, si data actualizarii :  02-08-2026 14:46:22
 2026-08-02 14:46:22,126-INFO-__main__-A doua tranzactie pe acelasi gateway - a fost sarita direct? Rezultat: Status.REJECTED
+2026-08-10 13:26:06,175-INFO-core.orchestrator-Tranzactia cu ID-ul : a0190167-31c6-4d5a-b598-5d3ff4390f8a este pe status-ul : PENDING, cu data crearii : 10-08-2026 13:26:06, si data actualizarii :  10-08-2026 13:26:06
+2026-08-10 13:26:06,180-WARNING-core.orchestrator-Gateway-ul RazorpayMock este indisponibil pentru tranzactia a0190167-31c6-4d5a-b598-5d3ff4390f8a!
+2026-08-10 13:26:06,180-WARNING-core.orchestrator-Gateway-ul StripeMock este indisponibil pentru tranzactia a0190167-31c6-4d5a-b598-5d3ff4390f8a!
+2026-08-10 13:26:06,180-WARNING-core.orchestrator-Gateway-ul PayUMock este indisponibil pentru tranzactia a0190167-31c6-4d5a-b598-5d3ff4390f8a!
+2026-08-10 13:26:06,180-WARNING-core.orchestrator-Gateway-ul UPIMock este indisponibil pentru tranzactia a0190167-31c6-4d5a-b598-5d3ff4390f8a!
+2026-08-10 13:26:06,285-INFO-core.orchestrator-Tranzactia cu ID-ul : a0190167-31c6-4d5a-b598-5d3ff4390f8a este pe status-ul : REJECTED, cu data crearii : 10-08-2026 13:26:06, si data actualizarii :  10-08-2026 13:26:06
+2026-08-10 13:26:06,285-INFO-__main__-Status inainte de webhook: Status.REJECTED
+2026-08-10 13:26:06,285-ERROR-core.webhook-ALERTA: webhook contrazice starea existenta! Tranzactia a0190167-31c6-4d5a-b598-5d3ff4390f8a era Status.REJECTED, webhook spune succeeded
+2026-08-10 13:26:06,285-INFO-__main__-Status dupa webhook: Status.REJECTED
+2026-08-10 13:26:06,286-INFO-core.orchestrator-Tranzactia cu ID-ul : c8f43184-0332-4d62-a0b3-b720e7e6abdb este pe status-ul : PENDING, cu data crearii : 10-08-2026 13:26:06, si data actualizarii :  10-08-2026 13:26:06
+2026-08-10 13:26:06,286-WARNING-core.orchestrator-Gateway-ul RazorpayMock este indisponibil pentru tranzactia c8f43184-0332-4d62-a0b3-b720e7e6abdb!
+2026-08-10 13:26:06,286-WARNING-core.orchestrator-Gateway-ul StripeMock este indisponibil pentru tranzactia c8f43184-0332-4d62-a0b3-b720e7e6abdb!
+2026-08-10 13:26:06,286-WARNING-core.orchestrator-Gateway-ul PayUMock este indisponibil pentru tranzactia c8f43184-0332-4d62-a0b3-b720e7e6abdb!
+2026-08-10 13:26:06,286-WARNING-core.orchestrator-Gateway-ul UPIMock este indisponibil pentru tranzactia c8f43184-0332-4d62-a0b3-b720e7e6abdb!
+2026-08-10 13:26:06,387-INFO-core.orchestrator-Tranzactia cu ID-ul : c8f43184-0332-4d62-a0b3-b720e7e6abdb este pe status-ul : REJECTED, cu data crearii : 10-08-2026 13:26:06, si data actualizarii :  10-08-2026 13:26:06
+2026-08-10 13:26:06,387-INFO-__main__---- Demonstratie Circuit Breaker ---
+2026-08-10 13:26:06,387-INFO-core.orchestrator-Tranzactia cu ID-ul : 668989c2-4b0b-4739-b1a1-3f522b9dd510 este pe status-ul : PENDING, cu data crearii : 10-08-2026 13:26:06, si data actualizarii :  10-08-2026 13:26:06
+2026-08-10 13:26:06,387-INFO-core.orchestrator-Se proceseaza plata ...
+2026-08-10 13:26:06,387-INFO-core.orchestrator-Procesarea platii a esuat, se reincearca din nou ...
+2026-08-10 13:26:06,387-INFO-core.orchestrator-Procesarea platii a esuat, se reincearca din nou ...
+2026-08-10 13:26:06,388-WARNING-core.breaker-Circuit breaker deschis dupa 3 esecuri consecutive
+2026-08-10 13:26:06,388-ERROR-core.orchestrator-Procesarea platii a esuat definitiv dupa 3 incercari!
+2026-08-10 13:26:06,388-INFO-core.orchestrator-Tranzactia cu ID-ul : 668989c2-4b0b-4739-b1a1-3f522b9dd510 este pe status-ul : REJECTED, cu data crearii : 10-08-2026 13:26:06, si data actualizarii :  10-08-2026 13:26:06
+2026-08-10 13:26:06,388-INFO-__main__-Starea circuit breaker-ului dupa esecuri repetate: CircuitState.OPEN
+2026-08-10 13:26:06,388-INFO-core.orchestrator-Tranzactia cu ID-ul : 43b67026-18d8-40b1-bc66-2d9dec33310c este pe status-ul : PENDING, cu data crearii : 10-08-2026 13:26:06, si data actualizarii :  10-08-2026 13:26:06
+2026-08-10 13:26:06,388-WARNING-core.orchestrator-Circuit breaker deschis pentru BadGateway, sarim peste
+2026-08-10 13:26:06,389-INFO-core.orchestrator-Tranzactia cu ID-ul : 43b67026-18d8-40b1-bc66-2d9dec33310c este pe status-ul : REJECTED, cu data crearii : 10-08-2026 13:26:06, si data actualizarii :  10-08-2026 13:26:06
+2026-08-10 13:26:06,389-INFO-__main__-A doua tranzactie pe acelasi gateway - a fost sarita direct? Rezultat: Status.REJECTED

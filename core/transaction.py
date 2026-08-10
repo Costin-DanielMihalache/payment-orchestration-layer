@@ -36,3 +36,14 @@ class Transaction:
         return (f"Tranzactia cu ID-ul : {self.transaction_id} este pe status-ul : {self.status.value}, cu data crearii"
                 f" : {self.created_at.strftime('%d-%m-%Y %H:%M:%S')}, si data actualizarii : "
                 f" {self.updated_at.strftime('%d-%m-%Y %H:%M:%S')}")
+
+    @classmethod
+    def from_row(cls,transaction_id,amount,currency,status,created_at,updated_at):
+        transaction=cls.__new__(cls)
+        transaction.transaction_id=transaction_id
+        transaction.amount=amount
+        transaction.currency=currency
+        transaction.status=status
+        transaction.created_at=created_at
+        transaction.updated_at=updated_at
+        return transaction
