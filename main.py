@@ -9,6 +9,7 @@ from core.orchestrator import process_with_failover
 from tests.fake_gateway import FakeGateway
 from core.logging_config import setup_logging
 from core.repository import TransactionRepository
+from core.payment_registry import PaymentRegistry
 import logging
 
 setup_logging()
@@ -31,9 +32,10 @@ def main():
     transactions={}
     webhook_processor=WebhookProcessor()
     repository=TransactionRepository()
+    payment_registry=PaymentRegistry()
     t=Transaction(200,"LEU")
     transactions[t.transaction_id]=t
-    process_with_failover(gateways,t,[Status.PROCESSING],repository=repository)
+    process_with_failover(gateways,t,[Status.PROCESSING],repository=repository,payment_registry=payment_registry)
 
     logger.info(f"Status inainte de webhook: {t.status}")
 
