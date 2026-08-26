@@ -1,20 +1,45 @@
 from core.transaction import Transaction
 from core.status import Status
 import logging
+import sqlite3
 
 logger=logging.getLogger(__name__)
 
 class WebhookProcessor:
-    def __init__(self):
-        self.processed_webhook_ids=set()
+    def __init__(self,db_path="transactions.db"):
+        self.connection=sqlite3.connect(db_path,check_same_thread=False)
+        self._create_table()
+
+
+    def _create_table(self):
+        self.connection.execute("""
+        CREATE TABLE IF NOT EXISTS processed_webhooks (
+            webhook_id TEXT PRIMARY KEY
+            )
+        """)
+        self.connection.commit()
+
+    def _is_webhook_processed(self,webhook_id:str) ->bool:
+        cursor=self.connection.execute(
+             "SELECT 1 FROM processed_webhooks WHERE webhook_id=?",
+             (webhook_id,)
+         )
+        return cursor.fetchone() is not None
+
+    def _mark_webhook_processed(self,webhook_id:str) :
+        self.connection.execute(
+            "INSERT OR REPLACE INTO processed_webhooks (webhook_id) VALUES (?)",
+            (webhook_id,)
+        )
+        self.connection.commit()
 
     def receive_webhook(self,payload:dict,transactions:dict[str,Transaction]) -> bool:
         webhook_id=payload["webhook_id"]
-        if webhook_id in self.processed_webhook_ids:
+        if self._is_webhook_processed(webhook_id):
             logger.info(f"Webhook {webhook_id} deja procesat, ignorat")
             return False
 
-        self.processed_webhook_ids.add(webhook_id)
+        self._mark_webhook_processed(webhook_id)
 
         transaction=transactions.get(payload["transaction_id"])
         if transaction is None:

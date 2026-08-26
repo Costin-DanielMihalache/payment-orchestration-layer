@@ -7,7 +7,7 @@ def test_webhook_succeeded_updates_transaction_to_accepted():
     t.change_status(Status.PROCESSING,delay=0)
     transactions={t.transaction_id:t}
 
-    processor=WebhookProcessor()
+    processor=WebhookProcessor(db_path=":memory:")
 
     payload={
         "webhook_id":"wh_001",
@@ -25,7 +25,7 @@ def test_duplicate_webhook_is_ignored():
     t.change_status(Status.PROCESSING,delay=0)
     transactions={t.transaction_id:t}
 
-    processor=WebhookProcessor()
+    processor=WebhookProcessor(db_path=":memory:")
     payload={
         "webhook_id":"wh_002",
         "transaction_id":t.transaction_id,
@@ -43,7 +43,7 @@ def test_duplicate_webhook_is_ignored():
 def test_transaction_not_found_rejected():
     transactions={}
 
-    processor=WebhookProcessor()
+    processor=WebhookProcessor(db_path=":memory:")
 
     payload={
         "webhook_id":"wh_003",
@@ -62,7 +62,7 @@ def test_amount_mismatch_rejected():
     t.change_status(Status.PROCESSING,delay=0)
     transactions={t.transaction_id:t}
 
-    processor=WebhookProcessor()
+    processor=WebhookProcessor(db_path=":memory:")
 
     payload={
         "webhook_id":"wh_004",
