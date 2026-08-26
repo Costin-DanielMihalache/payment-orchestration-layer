@@ -9,7 +9,7 @@ class PayUMock(PaymentGateway):
 
     def __init__(self):
         super().__init__("PayUMock")
-        self.is_healthy=random.random()>0.8
+        self.is_healthy=True
 
     def process_payment(self,transaction: Transaction) -> bool:
         if not self.is_healthy:
@@ -19,4 +19,5 @@ class PayUMock(PaymentGateway):
         return success
 
     def check_health(self) -> bool:
+        self.is_healthy = random.random() > 0.8
         return self.is_healthy

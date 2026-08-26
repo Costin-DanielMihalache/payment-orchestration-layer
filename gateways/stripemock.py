@@ -10,7 +10,7 @@ class StripeMock(PaymentGateway):
 
     def __init__(self):
         super().__init__("StripeMock")
-        self.is_healthy=random.random()>0.7
+        self.is_healthy=True
 
     def process_payment(self,transaction:Transaction ):
         if not self.is_healthy:
@@ -20,4 +20,5 @@ class StripeMock(PaymentGateway):
         return success
 
     def check_health(self) -> bool:
+        self.is_healthy=random.random()>0.7
         return self.is_healthy

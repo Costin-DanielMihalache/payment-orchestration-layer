@@ -8,7 +8,7 @@ logger=logging.getLogger(__name__)
 class RazorpayMock(PaymentGateway):
     def __init__(self):
         super().__init__("RazorpayMock")
-        self.is_healthy=random.random()>0.5
+        self.is_healthy=True
 
     def process_payment(self,transaction:Transaction) -> bool:
         if not self.is_healthy:
@@ -18,4 +18,5 @@ class RazorpayMock(PaymentGateway):
         return success
 
     def check_health(self) -> bool:
+        self.is_healthy = random.random() > 0.5
         return self.is_healthy
