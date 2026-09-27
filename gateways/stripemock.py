@@ -16,7 +16,7 @@ class StripeMock(PaymentGateway):
         if not self.is_healthy:
             return False
         success=random.random()>0.4
-        logger.info(f"StripeMock proceseaza tranzactia cu ID-ul {transaction.transaction_id} : {'success' if success else 'esec'}")
+        logger.info(f"StripeMock is processing transaction ID {transaction.transaction_id} : {'success' if success else 'failure'}")
         return success
 
     def check_health(self) -> bool:

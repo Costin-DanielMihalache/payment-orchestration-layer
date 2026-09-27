@@ -53,7 +53,7 @@ def get_transaction(transaction_id:str):
 @app.post("/transactions")
 def create_transaction(request:TransactionRequest):
     t=Transaction(request.amount,request.currency)
-    logger.info(f"Cerere noua de creare tranzactie: amount={request.amount}, currency={request.currency}")
+    logger.info(f"New transaction creation request: amount={request.amount}, currency={request.currency}")
     # Processing is synchronous (blocks the HTTP request until failover
     # finishes) - acceptable at the current volume (tested under 2s), but in
     # a system with real traffic this should go through an async queue

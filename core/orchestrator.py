@@ -10,10 +10,10 @@ logger=logging.getLogger(__name__)
 
 def check_gateway_health(gateway: PaymentGateway, transaction: Transaction) -> bool:
     if not gateway.circuit_breaker.allow_request():
-        logger.warning(f"Circuit breaker deschis pentru {gateway.name}, sarim peste")
+        logger.warning(f"Circuit breaker open for {gateway.name}, skipping")
         return False
     if not gateway.check_health():
-        logger.warning(f"Gateway-ul {gateway.name} este indisponibil pentru tranzactia {transaction.transaction_id}!")
+        logger.warning(f"Gateway {gateway.name} is unavailable for transaction {transaction.transaction_id}!")
         return False
     return True
 
@@ -27,15 +27,15 @@ def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_
     # double-charging
     already_processed=payment_registry.is_processed(transaction.transaction_id,gateway.name) if payment_registry else False
     if already_processed:
-        logger.info(f"Tranzactia {transaction.transaction_id} a fost deja procesata cu succes pe {gateway.name}!")
+        logger.info(f"Transaction {transaction.transaction_id} has already been successfully processed on {gateway.name}!")
     else:
         attempts = 0
         success = False
         while attempts < max_attempts and not success:
             if attempts == 0:
-                logger.info(f"Se proceseaza plata ...")
+                logger.info(f"Processing payment ...")
             else:
-                logger.info(f"Procesarea platii a esuat, se reincearca din nou ...")
+                logger.info(f"Payment processing failed, retrying ...")
             time.sleep(delay * 3)
             success = gateway.process_payment(transaction)
             gateway.total_attempts += 1
@@ -47,7 +47,7 @@ def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_
             time.sleep(delay)
             attempts += 1
         if not success:
-            logger.error(f"Procesarea platii a esuat definitiv dupa {attempts} incercari!")
+            logger.error(f"Payment processing failed permanently after {attempts} attempts!")
             return False
         if payment_registry:
             payment_registry.mark_processed(transaction.transaction_id,gateway.name)
@@ -58,7 +58,7 @@ def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_
     # RuntimeError instead of returning False - this case needs manual intervention,
     # not failover.
     if not transaction.try_change_status(next_status, delay=delay):
-        raise RuntimeError(f"Plata a reusit dar tranzitia de status a esuat pentru {transaction.transaction_id} - necesita interventie manuala!")
+        raise RuntimeError(f"Payment succeeded but the status transition failed for {transaction.transaction_id} - requires manual intervention!")
     if repository:
         repository.save(transaction)
     logger.info(transaction)
@@ -71,7 +71,7 @@ def process_full_flow(gateway: PaymentGateway, transaction: Transaction, statuse
             if not process_and_advance(gateway, transaction, status, delay=delay,repository=repository,payment_registry=payment_registry):
                 return False
         except RuntimeError as e:
-            logger.error(f"EROARE CRITICA: {e}")
+            logger.error(f"CRITICAL ERROR: {e}")
             raise
     return True
 
@@ -104,7 +104,7 @@ def process_with_failover(gateways: list[PaymentGateway], transaction: Transacti
                 # Don't continue to the next gateway - the payment already
                 # succeeded once (see RuntimeError in process_and_advance), so
                 # trying another gateway would risk a double charge
-                logger.error(f"Failover oprit - necesita interventie manuala: {e}")
+                logger.error(f"Failover stopped - requires manual intervention {e}")
                 return False
     # All gateways failed (or were unhealthy) - the transaction is
     # permanently rejected

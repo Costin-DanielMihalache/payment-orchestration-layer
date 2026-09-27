@@ -15,7 +15,7 @@ class PayUMock(PaymentGateway):
         if not self.is_healthy:
             return False
         success=random.random()>0.7
-        logger.info(f"PayUMock proceseaza tranzactia cu ID-ul {transaction.transaction_id} : {'succes' if success else 'esec'}")
+        logger.info(f"PayUMock is processing transaction ID {transaction.transaction_id} : {'success' if success else 'failure'}")
         return success
 
     def check_health(self) -> bool:

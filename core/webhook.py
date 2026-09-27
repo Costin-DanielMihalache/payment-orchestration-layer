@@ -39,21 +39,21 @@ class WebhookProcessor:
         # response, so the same webhook_id can arrive more than once - we
         # only process it once
         if self._is_webhook_processed(webhook_id):
-            logger.info(f"Webhook {webhook_id} deja procesat, ignorat")
+            logger.info(f"Webhook {webhook_id} already processed, ignored")
             return False
 
         self._mark_webhook_processed(webhook_id)
 
         transaction=transactions.get(payload["transaction_id"])
         if transaction is None:
-            logger.error(f"Tranzactia {payload['transaction_id']} nu exista local!")
+            logger.error(f"Transaction {payload['transaction_id']} does not exist locally!")
             return False
 
         # Reconciliation: the amount in the webhook must match our local
         # amount exactly, otherwise we treat it as a possible fraud/gateway
         # error and don't update the status
         if payload["amount"] !=transaction.amount:
-            logger.error(f"Sumele nu se potrivesc!")
+            logger.error(f"Amounts do not match!")
             return False
 
         if transaction.status in (Status.ACCEPTED,Status.REJECTED):
@@ -63,12 +63,12 @@ class WebhookProcessor:
             # (possibly a spoofed webhook or a gateway bug) and must be
             # flagged, not applied silently
             if payload["status"]=="succeeded" and transaction.status==Status.ACCEPTED:
-                logger.warning(f"Webhook redundant, tranzactia {transaction.transaction_id} era deja ACCEPTED")
+                logger.warning(f"Redundant webhook, transaction {transaction.transaction_id} was already ACCEPTED")
                 return True
             if payload["status"] == "failed" and transaction.status==Status.REJECTED:
-                logger.warning(f"Webhook redundant, tranzactia {transaction.transaction_id} era deja REJECTED")
+                logger.warning(f"Redundant webhook, transaction {transaction.transaction_id} was already REJECTED")
                 return True
-            logger.error(f"ALERTA: webhook contrazice starea existenta! Tranzactia {transaction.transaction_id} era {transaction.status}, webhook spune {payload['status']}")
+            logger.error(f"ALERT: webhook contradicts existing state! Transaction {transaction.transaction_id} was {transaction.status}, webhook says {payload['status']}")
             return False
 
         if payload["status"]== "succeeded":

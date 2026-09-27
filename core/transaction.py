@@ -19,7 +19,7 @@ class Transaction:
 
     def change_status(self,new_status:Status,delay=0.1):
         if new_status not in VALID_TRANSITIONS[self.status]:
-            raise ValueError(f"Nu poti trece din {self.status} in {new_status}")
+            raise ValueError(f"Cannot transition from {self.status} to {new_status}")
         self.status=new_status
         time.sleep(delay) # simulates real processing latency (I/O to the gateway)
         self.updated_at=datetime.now()
@@ -34,12 +34,12 @@ class Transaction:
             self.change_status(new_status,delay=delay)
             return True
         except ValueError as e:
-            logger.error(f"Eroare la tranzactia {self.transaction_id} : {e}")
+            logger.error(f"Error on transaction {self.transaction_id} : {e}")
             return False
 
     def __str__(self):
-        return (f"Tranzactia cu ID-ul : {self.transaction_id} este pe status-ul : {self.status.value}, cu data crearii"
-                f" : {self.created_at.strftime('%d-%m-%Y %H:%M:%S')}, si data actualizarii : "
+        return (f"Transaction with ID: {self.transaction_id} is in status: {self.status.value}, created on"
+                f" : {self.created_at.strftime('%d-%m-%Y %H:%M:%S')}, and updated on: "
                 f" {self.updated_at.strftime('%d-%m-%Y %H:%M:%S')}")
 
     @classmethod
