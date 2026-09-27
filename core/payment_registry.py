@@ -1,5 +1,9 @@
 import sqlite3
 
+# Separate from TransactionRepository: here we track, per
+# (transaction, gateway) pair, whether the payment was already processed
+# successfully - used strictly for idempotency in orchestrator.py, not for
+# the transaction's overall state (that's repository.py's job)
 class PaymentRegistry:
     def __init__(self,db_path="transactions.db"):
         self.connection=sqlite3.connect(db_path,check_same_thread=False)

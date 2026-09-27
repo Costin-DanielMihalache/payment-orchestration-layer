@@ -35,6 +35,9 @@ class WebhookProcessor:
 
     def receive_webhook(self,payload:dict,transactions:dict[str,Transaction]) -> bool:
         webhook_id=payload["webhook_id"]
+        # Deduplication: real gateways resend the same webhook on timeout/no
+        # response, so the same webhook_id can arrive more than once - we
+        # only process it once
         if self._is_webhook_processed(webhook_id):
             logger.info(f"Webhook {webhook_id} deja procesat, ignorat")
             return False
@@ -46,11 +49,19 @@ class WebhookProcessor:
             logger.error(f"Tranzactia {payload['transaction_id']} nu exista local!")
             return False
 
+        # Reconciliation: the amount in the webhook must match our local
+        # amount exactly, otherwise we treat it as a possible fraud/gateway
+        # error and don't update the status
         if payload["amount"] !=transaction.amount:
             logger.error(f"Sumele nu se potrivesc!")
             return False
 
         if transaction.status in (Status.ACCEPTED,Status.REJECTED):
+            # The transaction is already in a terminal state - a webhook
+            # confirming the same state is redundant (normal, gateways resend),
+            # but one saying something else is a serious contradiction
+            # (possibly a spoofed webhook or a gateway bug) and must be
+            # flagged, not applied silently
             if payload["status"]=="succeeded" and transaction.status==Status.ACCEPTED:
                 logger.warning(f"Webhook redundant, tranzactia {transaction.transaction_id} era deja ACCEPTED")
                 return True

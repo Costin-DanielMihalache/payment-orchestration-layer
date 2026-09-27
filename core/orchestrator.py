@@ -21,6 +21,10 @@ def check_gateway_health(gateway: PaymentGateway, transaction: Transaction) -> b
 def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_status: Status, max_attempts=3, delay=0.1,repository=None,payment_registry=None) -> bool:
     if not check_gateway_health(gateway, transaction):
         return False
+    # Idempotency: if this transaction was already sent successfully to the
+    # same gateway (e.g. a retry triggered by a client-side timeout that
+    # didn't know the payment had succeeded), don't send it again - avoids
+    # double-charging
     already_processed=payment_registry.is_processed(transaction.transaction_id,gateway.name) if payment_registry else False
     if already_processed:
         logger.info(f"Tranzactia {transaction.transaction_id} a fost deja procesata cu succes pe {gateway.name}!")
@@ -47,6 +51,12 @@ def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_
             return False
         if payment_registry:
             payment_registry.mark_processed(transaction.transaction_id,gateway.name)
+    # The payment already succeeded at the gateway at this point - if the
+    # status transition fails now (corrupted/inconsistent internal state), we
+    # can NOT treat this as a normal retry failure: the money was taken, but
+    # the system isn't sure what state the transaction is in. That's why we raise
+    # RuntimeError instead of returning False - this case needs manual intervention,
+    # not failover.
     if not transaction.try_change_status(next_status, delay=delay):
         raise RuntimeError(f"Plata a reusit dar tranzitia de status a esuat pentru {transaction.transaction_id} - necesita interventie manuala!")
     if repository:
@@ -71,11 +81,17 @@ def sort_gateways_by_success_rate(gateways: list[PaymentGateway]) -> list[Paymen
 
 
 def process_with_failover(gateways: list[PaymentGateway], transaction: Transaction, statuses: list[Status], delay=0.1,repository=None,payment_registry=None) -> bool:
+    # Try gateways in order of historical success rate (not random/fixed), to
+    # maximize the chance of success on the first attempt
     gateways = sort_gateways_by_success_rate(gateways)
     logger.info(transaction)
     if repository:
         repository.save(transaction)
     for gateway in gateways:
+        # If a previous gateway was already tried and failed, the transaction
+        # is left in PROCESSING - reset it explicitly to PENDING before
+        # moving to the next gateway, so the transition below (PENDING ->
+        # PROCESSING) is always valid per the state machine
         if transaction.status == Status.PROCESSING:
             transaction.try_change_status(Status.PENDING, delay=delay)
             if repository:
@@ -85,8 +101,13 @@ def process_with_failover(gateways: list[PaymentGateway], transaction: Transacti
                 if process_full_flow(gateway, transaction, statuses, delay=delay,repository=repository,payment_registry=payment_registry):
                     return True
             except RuntimeError as e:
+                # Don't continue to the next gateway - the payment already
+                # succeeded once (see RuntimeError in process_and_advance), so
+                # trying another gateway would risk a double charge
                 logger.error(f"Failover oprit - necesita interventie manuala: {e}")
                 return False
+    # All gateways failed (or were unhealthy) - the transaction is
+    # permanently rejected
     transaction.try_change_status(Status.REJECTED, delay=delay)
     if repository:
         repository.save(transaction)

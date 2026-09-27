@@ -41,7 +41,7 @@ def root():
 def get_transaction(transaction_id:str):
     transaction=repository.get(transaction_id)
     if transaction is None:
-        raise HTTPException(status_code=404,detail="Tranzactia cu a fost gasita")
+        raise HTTPException(status_code=404,detail="Tranzactia cu acest ID fost gasita")
     return {
         "transaction_id":transaction.transaction_id,
         "amount":transaction.amount,
@@ -54,6 +54,9 @@ def get_transaction(transaction_id:str):
 def create_transaction(request:TransactionRequest):
     t=Transaction(request.amount,request.currency)
     logger.info(f"Cerere noua de creare tranzactie: amount={request.amount}, currency={request.currency}")
+    # Processing is synchronous (blocks the HTTP request until failover
+    # finishes) - acceptable at the current volume (tested under 2s), but in
+    # a system with real traffic this should go through an async queue
     process_with_failover(gateways,t,[Status.PROCESSING],repository=repository,payment_registry=payment_registry)
     return {"transaction_id":t.transaction_id,"status":t.status.value}
 

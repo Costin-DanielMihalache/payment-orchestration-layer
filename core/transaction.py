@@ -21,10 +21,15 @@ class Transaction:
         if new_status not in VALID_TRANSITIONS[self.status]:
             raise ValueError(f"Nu poti trece din {self.status} in {new_status}")
         self.status=new_status
-        time.sleep(delay)
+        time.sleep(delay) # simulates real processing latency (I/O to the gateway)
         self.updated_at=datetime.now()
 
     def try_change_status(self,new_status:Status,delay=0.1) -> bool:
+        # Wrapper that doesn't propagate the exception - orchestrator.py
+        # handles a transition failure differently depending on whether the
+        # payment already succeeded or the transition fails before the
+        # payment is attempted, so the caller needs to check the result
+        # without a try/except at every step
         try:
             self.change_status(new_status,delay=delay)
             return True

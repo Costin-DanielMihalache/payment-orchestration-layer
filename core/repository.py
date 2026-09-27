@@ -22,6 +22,10 @@ class TransactionRepository:
         self.connection.commit()
 
     def save(self,transaction:Transaction):
+        # INSERT OR REPLACE on the primary key: every call saves the full
+        # current state of the transaction (upsert), not just the changed
+        # fields - simple and sufficient at the current volume, but means we
+        # don't keep a history of transitions, only the latest state
         self.connection.execute(
             "INSERT OR REPLACE INTO transactions (transaction_id,amount,currency,status,created_at,updated_at) VALUES (?,?,?,?,?,?)",
             (transaction.transaction_id,transaction.amount,transaction.currency,transaction.status.value,transaction.created_at.isoformat(),transaction.updated_at.isoformat())
