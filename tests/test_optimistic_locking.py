@@ -10,6 +10,7 @@ from core.idempotency import IdempotencyStore
 from core.transaction import Transaction
 from core.status import Status
 from tests.fake_gateway import FakeGateway
+from tests.webhook_helpers import TEST_SECRET,post_signed_webhook
 
 
 def test_version_is_0_before_the_first_save_and_1_after():
@@ -102,6 +103,7 @@ def test_api_returns_409_on_conflict_and_the_webhook_retry_is_then_accepted(monk
     monkeypatch.setattr(api,"payment_registry",PaymentRegistry(db=db))
     monkeypatch.setattr(api,"webhook_processor",WebhookProcessor(db=db))
     monkeypatch.setattr(api,"idempotency_store",IdempotencyStore(db=db))
+    monkeypatch.setattr(api,"webhook_secret",TEST_SECRET)
     monkeypatch.setattr(api,"gateways",[FakeGateway(name="Fake",healthy=True,payment_results=[True])])
     client=TestClient(api.app)
 
@@ -120,12 +122,12 @@ def test_api_returns_409_on_conflict_and_the_webhook_retry_is_then_accepted(monk
         return loaded
     monkeypatch.setattr(repository,"get",get_then_conflict)
 
-    conflict=client.post("/webhooks",json=payload)
+    conflict=post_signed_webhook(client,payload)
     assert conflict.status_code==409
 
     monkeypatch.setattr(repository,"get",real_get)
     assert client.get(f"/transactions/{transaction_id}").json()["status"]=="PROCESSING"
 
     # The conflicting attempt must not have marked the webhook as processed
-    retry=client.post("/webhooks",json=payload)
+    retry=post_signed_webhook(client,payload)
     assert retry.json()=={"processed":True,"status":"ACCEPTED"}

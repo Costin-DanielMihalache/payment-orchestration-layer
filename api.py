@@ -18,6 +18,10 @@ from pydantic import BaseModel,Field,field_validator
 from core.idempotency import IdempotencyStore
 from core.currency import SUPPORTED_CURRENCIES
 from core.status import  WebhookStatus
+import os
+from fastapi import FastAPI,HTTPException,Header,Depends,Request
+from pydantic import BaseModel,Field,field_validator,ValidationError
+from core.webhook_security import verify_signature
 
 setup_logging()
 
@@ -32,6 +36,9 @@ payment_registry=PaymentRegistry(db=db)
 gateways=[RazorpayMock(),StripeMock(),PayUMock(),UPIMock()]
 idempotency_store=IdempotencyStore(db=db)
 webhook_processor=WebhookProcessor(db=db)
+# Secret shared with the gateway, read from the environment - never hardcoded.
+# If it is missing, the webhook endpoint refuses everything (fail closed).
+webhook_secret=os.environ.get("WEBHOOK_SECRET")
 
 class TransactionRequest(BaseModel):
     # Minor units (1050 = 10.50 EUR). strict=True rejects floats and strings.
@@ -98,8 +105,26 @@ def create_transaction(request:TransactionRequest,idempotency_key:str|None=Heade
         raise HTTPException(status_code=409,detail="Transaction was modified concurrently, fetch it again to see its current state")
     return {"transaction_id":t.transaction_id,"status":t.status.value}
 
+async def verified_webhook_body(request:Request,x_signature:str|None=Header(default=None)) -> bytes:
+    # Runs BEFORE anything is parsed or read from the database: an unsigned or
+    # forged webhook must not get to learn anything (not even 404 vs 200)
+    if not webhook_secret:
+        logger.error("WEBHOOK_SECRET is not configured, refusing all webhooks")
+        raise HTTPException(status_code=500,detail="Webhook verification is not configured")
+    body=await request.body()
+    if not verify_signature(webhook_secret,body,x_signature):
+        logger.warning("Webhook rejected: missing or invalid X-Signature")
+        raise HTTPException(status_code=401,detail="Invalid webhook signature")
+    return body
+
 @app.post("/webhooks")
-def receive_webhook_endpoint(payload:WebhookPayload):
+def receive_webhook_endpoint(body:bytes=Depends(verified_webhook_body)):
+    # The signature was checked on the raw bytes, so the payload is parsed
+    # from those same bytes
+    try:
+        payload=WebhookPayload.model_validate_json(body)
+    except ValidationError as e:
+        raise HTTPException(status_code=422,detail=e.errors(include_url=False,include_context=False))
     transaction=repository.get(payload.transaction_id)
     if transaction is None:
         raise HTTPException(status_code=404,detail="Transaction not found")
@@ -113,4 +138,3 @@ def receive_webhook_endpoint(payload:WebhookPayload):
     except ConcurrentModificationError:
         raise HTTPException(status_code=409, detail="Transaction was modified concurrently, retry the webhook")
     return {"processed":result, "status":transaction.status.value}
-

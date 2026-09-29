@@ -7,6 +7,7 @@ from core.webhook import WebhookProcessor
 from core.idempotency import IdempotencyStore
 from tests.fake_gateway import FakeGateway
 from core.database import Database
+from tests.webhook_helpers import TEST_SECRET,post_signed_webhook
 
 
 @pytest.fixture
@@ -21,6 +22,7 @@ def client(monkeypatch):
     monkeypatch.setattr(api,"payment_registry",PaymentRegistry(db=db))
     monkeypatch.setattr(api,"webhook_processor",WebhookProcessor(db=db))
     monkeypatch.setattr(api,"idempotency_store",IdempotencyStore(db=db))
+    monkeypatch.setattr(api, "webhook_secret", TEST_SECRET)
     monkeypatch.setattr(api,"gateways",[FakeGateway(name="Fake",healthy=True,payment_results=[True])])
     return TestClient(api.app)
 
@@ -76,13 +78,12 @@ def create_processing_transaction(client,key="k",amount=1000):
 
 
 def webhook(client,transaction_id,webhook_id="wh_1",amount=1000,status="succeeded"):
-    return client.post("/webhooks",json={
+    return post_signed_webhook(client,{
         "webhook_id":webhook_id,
         "transaction_id":transaction_id,
         "amount":amount,
         "status":status
     })
-
 
 def test_get_existing_transaction_returns_its_data(client):
     transaction_id=create_processing_transaction(client)
