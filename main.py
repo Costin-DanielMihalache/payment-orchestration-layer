@@ -33,7 +33,7 @@ def main():
     webhook_processor=WebhookProcessor()
     repository=TransactionRepository()
     payment_registry=PaymentRegistry()
-    t=Transaction(200,"LEU")
+    t=Transaction(200,"RON")
     transactions[t.transaction_id]=t
     process_with_failover(gateways,t,[Status.PROCESSING],repository=repository,payment_registry=payment_registry)
 

@@ -8,7 +8,8 @@ logger=logging.getLogger(__name__)
 
 class Transaction:
 
-    def __init__(self,amount=0,currency="EUR",status:Status=Status.PENDING):
+    # amount is stored in minor units (e.g. 1050 = 10.50 EUR), never as a float
+    def __init__(self, amount: int = 0, currency="EUR", status: Status = Status.PENDING):
         self.transaction_id=str(uuid.uuid4())
         self.amount=amount
         self.currency=currency

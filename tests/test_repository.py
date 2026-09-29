@@ -5,7 +5,7 @@ from core.status import Status
 def test_save_and_get_returns_identical_transaction():
     repo=TransactionRepository(db_path=":memory:")
 
-    t=Transaction(200,"LEU")
+    t=Transaction(200,"RON")
     t.change_status(Status.PROCESSING,delay=0)
     repo.save(t)
 

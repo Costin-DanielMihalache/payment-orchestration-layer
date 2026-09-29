@@ -77,7 +77,7 @@ def test_amount_mismatch_rejected():
     assert t.status==Status.PROCESSING
 
 def test_webhook_on_pending_transaction_returns_false():
-    t=Transaction(500,"LEU")
+    t=Transaction(500,"RON")
     transactions={t.transaction_id:t}
     processor=WebhookProcessor(db_path=":memory:")
     payload={"webhook_id":"wh_005","transaction_id":t.transaction_id,"amount":500,"status":"succeeded"}
@@ -89,7 +89,7 @@ def test_webhook_on_pending_transaction_returns_false():
 
 
 def test_unknown_webhook_status_is_ignored():
-    t=Transaction(500,"LEU")
+    t=Transaction(500,"RON")
     t.change_status(Status.PROCESSING,delay=0)
     transactions={t.transaction_id:t}
     processor=WebhookProcessor(db_path=":memory:")
@@ -102,7 +102,7 @@ def test_unknown_webhook_status_is_ignored():
 
 
 def test_webhook_not_marked_processed_when_amount_mismatch():
-    t=Transaction(500,"LEU")
+    t=Transaction(500,"RON")
     t.change_status(Status.PROCESSING,delay=0)
     transactions={t.transaction_id:t}
     processor=WebhookProcessor(db_path=":memory:")
