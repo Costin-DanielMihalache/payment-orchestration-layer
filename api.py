@@ -1,6 +1,4 @@
 import logging
-from fastapi import FastAPI,HTTPException
-from pydantic import BaseModel
 from core.transaction import Transaction
 from core.status import Status
 from core.logging_config import setup_logging
@@ -13,8 +11,6 @@ from gateways.stripemock import StripeMock
 from gateways.payumock import PayUMock
 from gateways.upimock import UPIMock
 from core.webhook import WebhookProcessor
-from fastapi import FastAPI,HTTPException,Header
-from pydantic import BaseModel,Field,field_validator
 from core.idempotency import IdempotencyStore
 from core.currency import SUPPORTED_CURRENCIES
 from core.status import  WebhookStatus
