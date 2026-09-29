@@ -3,6 +3,7 @@ from core.transaction import Transaction
 from core.status import Status
 import time
 import logging
+from core.repository import ConcurrentModificationError
 
 logger=logging.getLogger(__name__)
 
@@ -49,8 +50,12 @@ def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_
         if not success:
             logger.error(f"Payment processing failed permanently after {attempts} attempts!")
             return False
+        # Deliberately committed on its own, NOT grouped with the status save
+        # below: the money already moved, so this record must survive even if
+        # saving the status fails. If both were one transaction, a failed save
+        # would roll this back too and a retry would charge the customer again.
         if payment_registry:
-            payment_registry.mark_processed(transaction.transaction_id,gateway.name)
+            payment_registry.mark_processed(transaction.transaction_id, gateway.name)
     # The payment already succeeded at the gateway at this point - if the
     # status transition fails now (corrupted/inconsistent internal state), we
     # can NOT treat this as a normal retry failure: the money was taken, but
@@ -60,7 +65,14 @@ def process_and_advance(gateway: PaymentGateway, transaction: Transaction, next_
     if not transaction.try_change_status(next_status, delay=delay):
         raise RuntimeError(f"Payment succeeded but the status transition failed for {transaction.transaction_id} - requires manual intervention!")
     if repository:
-        repository.save(transaction)
+        try:
+            repository.save(transaction)
+        except ConcurrentModificationError as e:
+            # Same category as a failed transition: the payment succeeded, but
+            # someone else changed this transaction meanwhile, so we don't know
+            # what state is correct - manual intervention, not failover
+            raise RuntimeError(
+                f"Payment succeeded but transaction {transaction.transaction_id} was modified concurrently - requires manual intervention!") from e
     logger.info(transaction)
     return True
 

@@ -1,39 +1,53 @@
 from core.transaction import Transaction
 import logging
-import sqlite3
+from core.database import Database
 from core.status import Status, WebhookStatus
 
 logger=logging.getLogger(__name__)
 
 class WebhookProcessor:
-    def __init__(self,db_path="transactions.db"):
-        self.connection=sqlite3.connect(db_path,check_same_thread=False)
+    def __init__(self, db_path="transactions.db", db: Database | None = None):
+        self.db = db if db is not None else Database(db_path)
         self._create_table()
 
 
     def _create_table(self):
-        self.connection.execute("""
-        CREATE TABLE IF NOT EXISTS processed_webhooks (
-            webhook_id TEXT PRIMARY KEY
-            )
-        """)
-        self.connection.commit()
+        with self.db.transaction() as connection:
+            connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS processed_webhooks
+            (
+                webhook_id TEXT PRIMARY KEY
+                )
+            """)
 
     def _is_webhook_processed(self,webhook_id:str) ->bool:
-        cursor=self.connection.execute(
+        row = self.db.fetchone(
              "SELECT 1 FROM processed_webhooks WHERE webhook_id=?",
              (webhook_id,)
          )
-        return cursor.fetchone() is not None
+        return row is not None
 
     def _mark_webhook_processed(self,webhook_id:str) :
-        self.connection.execute(
-            "INSERT OR REPLACE INTO processed_webhooks (webhook_id) VALUES (?)",
-            (webhook_id,)
-        )
-        self.connection.commit()
+        with self.db.transaction() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO processed_webhooks (webhook_id) VALUES (?)",
+                (webhook_id,)
+            )
 
-    def receive_webhook(self,payload:dict,transactions:dict[str,Transaction]) -> bool:
+    def receive_webhook(self, payload: dict, transactions: dict[str, Transaction], repository=None) -> bool:
+        # If a repository is given, the new status is saved together with the
+
+        # "webhook processed" mark in ONE database transaction (atomicity):
+        # either both happen or neither. Without it, a crash between the two
+        # would leave the webhook marked as processed but the status unsaved,
+        # and the gateway's retry would then be ignored as a duplicate - the
+        # transaction stuck in PROCESSING forever.
+        # The repository must use the same Database as this processor,
+        # otherwise the two writes can't share a transaction.
+
+        if repository is not None and repository.db is not self.db:
+            raise ValueError("repository and WebhookProcessor must share the same Database to be atomic")
         webhook_id=payload["webhook_id"]
         # Deduplication: real gateways resend the same webhook on timeout/no
         # response, so the same webhook_id can arrive more than once - we
@@ -83,6 +97,11 @@ class WebhookProcessor:
             # later resend must still be accepted
             return False
 
-        # Mark as processed only after the webhook was actually applied
-        self._mark_webhook_processed(webhook_id)
+        # Mark as processed only after the webhook was actually applied. If
+        # saving the status fails (e.g. ConcurrentModificationError), the mark
+        # is rolled back too, so the gateway's retry is still accepted.
+        with self.db.transaction():
+            self._mark_webhook_processed(webhook_id)
+            if repository is not None:
+                repository.save(transaction)
         return True

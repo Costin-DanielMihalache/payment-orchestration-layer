@@ -16,6 +16,9 @@ class Transaction:
         self.status=status
         self.created_at=datetime.now()
         self.updated_at=datetime.now()
+        # Optimistic locking: version of the database row this object was
+        # loaded from / last saved as (0 = never saved). See repository.save()
+        self.version = 0
 
 
     def change_status(self,new_status:Status,delay=0.1):
@@ -44,7 +47,7 @@ class Transaction:
                 f" {self.updated_at.strftime('%d-%m-%Y %H:%M:%S')}")
 
     @classmethod
-    def from_row(cls,transaction_id,amount,currency,status,created_at,updated_at):
+    def from_row(cls, transaction_id, amount, currency, status, created_at, updated_at, version=0):
         transaction=cls.__new__(cls)
         transaction.transaction_id=transaction_id
         transaction.amount=amount
@@ -52,4 +55,5 @@ class Transaction:
         transaction.status=status
         transaction.created_at=created_at
         transaction.updated_at=updated_at
+        transaction.version = version
         return transaction

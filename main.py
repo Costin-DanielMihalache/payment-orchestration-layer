@@ -11,6 +11,7 @@ from core.logging_config import setup_logging
 from core.repository import TransactionRepository
 from core.payment_registry import PaymentRegistry
 import logging
+from core.database import Database
 
 setup_logging()
 
@@ -30,9 +31,10 @@ def demo_circuit_breaker():
 def main():
     gateways=[RazorpayMock(),StripeMock(),PayUMock(),UPIMock()]
     transactions={}
-    webhook_processor=WebhookProcessor()
-    repository=TransactionRepository()
-    payment_registry=PaymentRegistry()
+    db = Database()
+    webhook_processor = WebhookProcessor(db=db)
+    repository = TransactionRepository(db=db)
+    payment_registry = PaymentRegistry(db=db)
     t=Transaction(200,"RON")
     transactions[t.transaction_id]=t
     process_with_failover(gateways,t,[Status.PROCESSING],repository=repository,payment_registry=payment_registry)
@@ -46,7 +48,7 @@ def main():
         "status" : "succeeded"
     }
 
-    webhook_processor.receive_webhook(payload,transactions)
+    webhook_processor.receive_webhook(payload, transactions, repository=repository)
 
     logger.info(f"Status after webhook: {t.status}")
     t1=Transaction(500)

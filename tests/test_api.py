@@ -6,16 +6,21 @@ from core.payment_registry import PaymentRegistry
 from core.webhook import WebhookProcessor
 from core.idempotency import IdempotencyStore
 from tests.fake_gateway import FakeGateway
+from core.database import Database
 
 
 @pytest.fixture
 def client(monkeypatch):
     # Fresh in-memory storage and a gateway that always succeeds, so tests
     # don't touch transactions.db and aren't random
-    monkeypatch.setattr(api,"repository",TransactionRepository(db_path=":memory:"))
-    monkeypatch.setattr(api,"payment_registry",PaymentRegistry(db_path=":memory:"))
-    monkeypatch.setattr(api,"webhook_processor",WebhookProcessor(db_path=":memory:"))
-    monkeypatch.setattr(api,"idempotency_store",IdempotencyStore(db_path=":memory:"))
+    # All components share ONE in-memory Database, like in production, so
+    # the atomic db.transaction() blocks in api.py work
+    db=Database(":memory:")
+    monkeypatch.setattr(api,"db",db)
+    monkeypatch.setattr(api,"repository",TransactionRepository(db=db))
+    monkeypatch.setattr(api,"payment_registry",PaymentRegistry(db=db))
+    monkeypatch.setattr(api,"webhook_processor",WebhookProcessor(db=db))
+    monkeypatch.setattr(api,"idempotency_store",IdempotencyStore(db=db))
     monkeypatch.setattr(api,"gateways",[FakeGateway(name="Fake",healthy=True,payment_results=[True])])
     return TestClient(api.app)
 

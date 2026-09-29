@@ -5,7 +5,8 @@ from core.transaction import Transaction
 from core.status import Status
 from core.logging_config import setup_logging
 from core.orchestrator import process_with_failover
-from core.repository import TransactionRepository
+from core.database import Database
+from core.repository import TransactionRepository,ConcurrentModificationError
 from core.payment_registry import PaymentRegistry
 from gateways.razorpaymock import RazorpayMock
 from gateways.stripemock import StripeMock
@@ -23,11 +24,14 @@ setup_logging()
 logger=logging.getLogger(__name__)
 app=FastAPI()
 
-repository=TransactionRepository()
-payment_registry=PaymentRegistry()
+# One shared Database (single SQLite connection) for everything, so related
+# writes can be grouped in one atomic db.transaction() block
+db=Database()
+repository=TransactionRepository(db=db)
+payment_registry=PaymentRegistry(db=db)
 gateways=[RazorpayMock(),StripeMock(),PayUMock(),UPIMock()]
-idempotency_store=IdempotencyStore()
-webhook_processor=WebhookProcessor()
+idempotency_store=IdempotencyStore(db=db)
+webhook_processor=WebhookProcessor(db=db)
 
 class TransactionRequest(BaseModel):
     # Minor units (1050 = 10.50 EUR). strict=True rejects floats and strings.
@@ -70,7 +74,13 @@ def create_transaction(request:TransactionRequest,idempotency_key:str|None=Heade
         raise HTTPException(status_code=400,detail="Idempotency-Key header is required (max 255 characters)")
     t=Transaction(request.amount,request.currency)
     fingerprint=f"{request.amount}:{request.currency}"
-    existing=idempotency_store.reserve(idempotency_key,fingerprint,t.transaction_id)
+    # Reserve the key and save the transaction in ONE database transaction: if
+    # the save fails, the key is not left reserved for a transaction that
+    # doesn't exist (which would make every retry fail with 409)
+    with db.transaction():
+        existing = idempotency_store.reserve(idempotency_key, fingerprint, t.transaction_id)
+        if existing is None:
+            repository.save(t)
     if existing is not None:
         existing_id,existing_fingerprint=existing
         if existing_fingerprint!=fingerprint:
@@ -80,10 +90,12 @@ def create_transaction(request:TransactionRequest,idempotency_key:str|None=Heade
             raise HTTPException(status_code=409,detail="The original request is still being created, retry shortly")
         logger.info(f"Replayed request for Idempotency-Key {idempotency_key}, returning transaction {existing_id}")
         return {"transaction_id":previous.transaction_id,"status":previous.status.value}
-    repository.save(t)
+
     logger.info(f"New transaction creation request: amount={request.amount}, currency={request.currency}")
-    # (comentariul tău despre procesarea sincronă rămâne aici)
-    process_with_failover(gateways,t,[Status.PROCESSING],repository=repository,payment_registry=payment_registry)
+    try:
+        process_with_failover(gateways,t,[Status.PROCESSING],repository=repository,payment_registry=payment_registry)
+    except ConcurrentModificationError:
+        raise HTTPException(status_code=409,detail="Transaction was modified concurrently, fetch it again to see its current state")
     return {"transaction_id":t.transaction_id,"status":t.status.value}
 
 @app.post("/webhooks")
@@ -92,8 +104,13 @@ def receive_webhook_endpoint(payload:WebhookPayload):
     if transaction is None:
         raise HTTPException(status_code=404,detail="Transaction not found")
     transactions_dict={transaction.transaction_id:transaction}
-    result=webhook_processor.receive_webhook(payload.model_dump(),transactions_dict)
-    if result:
-        repository.save(transaction)
+    # The repository is passed in so the status save and the "webhook processed"
+    # mark are committed together. If another request changed this transaction
+    # since we read it, nothing is applied or marked, and the gateway's retry
+    # (after the 409) will read the fresh state.
+    try:
+        result = webhook_processor.receive_webhook(payload.model_dump(), transactions_dict, repository=repository)
+    except ConcurrentModificationError:
+        raise HTTPException(status_code=409, detail="Transaction was modified concurrently, retry the webhook")
     return {"processed":result, "status":transaction.status.value}
 
