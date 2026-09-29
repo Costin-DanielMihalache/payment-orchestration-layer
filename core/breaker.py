@@ -34,12 +34,11 @@ class CircuitBreaker:
         self.failure_count=0
 
     def try_change_state_to_half_open(self):
-        # HALF_OPEN = a single "test" transaction is let through after
-        # recovery_timeout, to check whether the gateway has recovered,
-        # without sending it all the traffic at once
+        # HALF_OPEN = after recovery_timeout, requests are allowed through again;
+        # the next success closes the circuit, the next failure reopens it
         if self.state==CircuitState.OPEN and time.time()-self.opened_at>=self.recovery_timeout:
             self.state=CircuitState.HALF_OPEN
-            logger.info("Circuit breaker transitions to HALP_OPEN, testing the gateway again")
+            logger.info("Circuit breaker transitions to HALF_OPEN, testing the gateway again")
 
     def allow_request(self) -> bool:
         self.try_change_state_to_half_open()

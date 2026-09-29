@@ -41,7 +41,7 @@ def root():
 def get_transaction(transaction_id:str):
     transaction=repository.get(transaction_id)
     if transaction is None:
-        raise HTTPException(status_code=404,detail="Tranzactia cu acest ID fost gasita")
+        raise HTTPException(status_code=404,detail="Transaction not found")
     return {
         "transaction_id":transaction.transaction_id,
         "amount":transaction.amount,
@@ -64,7 +64,7 @@ def create_transaction(request:TransactionRequest):
 def receive_webhook_endpoint(payload:WebhookPayload):
     transaction=repository.get(payload.transaction_id)
     if transaction is None:
-        raise HTTPException(status_code=404,detail="Transactia nu a fost gasita")
+        raise HTTPException(status_code=404,detail="Transaction not found")
     transactions_dict={transaction.transaction_id:transaction}
     result=webhook_processor.receive_webhook(payload.model_dump(),transactions_dict)
     if result:

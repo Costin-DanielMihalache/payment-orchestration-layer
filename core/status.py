@@ -1,5 +1,9 @@
 from enum import Enum
 
+class WebhookStatus(Enum):
+    SUCCEEDED="succeeded"
+    FAILED="failed"
+
 class Status(Enum):
     PENDING="PENDING"
     PROCESSING="PROCESSING"

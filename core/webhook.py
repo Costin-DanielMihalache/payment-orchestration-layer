@@ -1,7 +1,7 @@
 from core.transaction import Transaction
-from core.status import Status
 import logging
 import sqlite3
+from core.status import Status, WebhookStatus
 
 logger=logging.getLogger(__name__)
 
@@ -42,7 +42,13 @@ class WebhookProcessor:
             logger.info(f"Webhook {webhook_id} already processed, ignored")
             return False
 
-        self._mark_webhook_processed(webhook_id)
+        # Unknown statuses (e.g. "refunded", "pending") are ignored instead of
+        # being treated as a failure
+        try:
+            webhook_status=WebhookStatus(payload["status"])
+        except ValueError:
+            logger.error(f"Webhook {webhook_id} has unknown status: {payload['status']}")
+            return False
 
         transaction=transactions.get(payload["transaction_id"])
         if transaction is None:
@@ -52,27 +58,31 @@ class WebhookProcessor:
         # Reconciliation: the amount in the webhook must match our local
         # amount exactly, otherwise we treat it as a possible fraud/gateway
         # error and don't update the status
-        if payload["amount"] !=transaction.amount:
-            logger.error(f"Amounts do not match!")
+        if payload["amount"] != transaction.amount:
+            logger.error("Amounts do not match!")
             return False
 
         if transaction.status in (Status.ACCEPTED,Status.REJECTED):
-            # The transaction is already in a terminal state - a webhook
-            # confirming the same state is redundant (normal, gateways resend),
-            # but one saying something else is a serious contradiction
-            # (possibly a spoofed webhook or a gateway bug) and must be
-            # flagged, not applied silently
-            if payload["status"]=="succeeded" and transaction.status==Status.ACCEPTED:
+            # Terminal state: a webhook confirming the same state is redundant
+            # (normal, gateways resend), but one saying something else is a
+            # serious contradiction and must be flagged, not applied silently
+            if webhook_status==WebhookStatus.SUCCEEDED and transaction.status==Status.ACCEPTED:
                 logger.warning(f"Redundant webhook, transaction {transaction.transaction_id} was already ACCEPTED")
+                self._mark_webhook_processed(webhook_id)
                 return True
-            if payload["status"] == "failed" and transaction.status==Status.REJECTED:
+            if webhook_status==WebhookStatus.FAILED and transaction.status==Status.REJECTED:
                 logger.warning(f"Redundant webhook, transaction {transaction.transaction_id} was already REJECTED")
+                self._mark_webhook_processed(webhook_id)
                 return True
-            logger.error(f"ALERT: webhook contradicts existing state! Transaction {transaction.transaction_id} was {transaction.status}, webhook says {payload['status']}")
+            logger.error(f"ALERT: webhook contradicts existing state! Transaction {transaction.transaction_id} was {transaction.status}, webhook says {webhook_status.value}")
             return False
 
-        if payload["status"]== "succeeded":
-            transaction.try_change_status(Status.ACCEPTED)
-        else:
-            transaction.try_change_status(Status.REJECTED)
+        new_status=Status.ACCEPTED if webhook_status==WebhookStatus.SUCCEEDED else Status.REJECTED
+        if not transaction.try_change_status(new_status):
+            # Don't mark as processed: the webhook was not applied, so a
+            # later resend must still be accepted
+            return False
+
+        # Mark as processed only after the webhook was actually applied
+        self._mark_webhook_processed(webhook_id)
         return True

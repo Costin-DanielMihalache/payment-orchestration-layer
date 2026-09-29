@@ -75,3 +75,40 @@ def test_amount_mismatch_rejected():
 
     assert result is False
     assert t.status==Status.PROCESSING
+
+def test_webhook_on_pending_transaction_returns_false():
+    t=Transaction(500,"LEU")
+    transactions={t.transaction_id:t}
+    processor=WebhookProcessor(db_path=":memory:")
+    payload={"webhook_id":"wh_005","transaction_id":t.transaction_id,"amount":500,"status":"succeeded"}
+
+    result=processor.receive_webhook(payload,transactions)
+
+    assert result is False
+    assert t.status==Status.PENDING
+
+
+def test_unknown_webhook_status_is_ignored():
+    t=Transaction(500,"LEU")
+    t.change_status(Status.PROCESSING,delay=0)
+    transactions={t.transaction_id:t}
+    processor=WebhookProcessor(db_path=":memory:")
+    payload={"webhook_id":"wh_006","transaction_id":t.transaction_id,"amount":500,"status":"refunded"}
+
+    result=processor.receive_webhook(payload,transactions)
+
+    assert result is False
+    assert t.status==Status.PROCESSING
+
+
+def test_webhook_not_marked_processed_when_amount_mismatch():
+    t=Transaction(500,"LEU")
+    t.change_status(Status.PROCESSING,delay=0)
+    transactions={t.transaction_id:t}
+    processor=WebhookProcessor(db_path=":memory:")
+    bad={"webhook_id":"wh_007","transaction_id":t.transaction_id,"amount":999,"status":"succeeded"}
+    good={"webhook_id":"wh_007","transaction_id":t.transaction_id,"amount":500,"status":"succeeded"}
+
+    assert processor.receive_webhook(bad,transactions) is False
+    assert processor.receive_webhook(good,transactions) is True
+    assert t.status==Status.ACCEPTED
