@@ -63,3 +63,94 @@ def test_invalid_amount_or_currency_is_rejected(client,body):
 
 def test_get_unknown_transaction_returns_404(client):
     assert client.get("/transactions/does-not-exist").status_code==404
+
+def create_processing_transaction(client,key="k",amount=1000):
+    response=client.post("/transactions",json={"amount":amount,"currency":"EUR"},headers={"Idempotency-Key":key})
+    assert response.json()["status"]=="PROCESSING"
+    return response.json()["transaction_id"]
+
+
+def webhook(client,transaction_id,webhook_id="wh_1",amount=1000,status="succeeded"):
+    return client.post("/webhooks",json={
+        "webhook_id":webhook_id,
+        "transaction_id":transaction_id,
+        "amount":amount,
+        "status":status
+    })
+
+
+def test_get_existing_transaction_returns_its_data(client):
+    transaction_id=create_processing_transaction(client)
+
+    response=client.get(f"/transactions/{transaction_id}")
+
+    assert response.status_code==200
+    body=response.json()
+    assert body["transaction_id"]==transaction_id
+    assert body["amount"]==1000
+    assert body["currency"]=="EUR"
+    assert body["status"]=="PROCESSING"
+
+
+def test_succeeded_webhook_accepts_transaction_and_persists_it(client):
+    transaction_id=create_processing_transaction(client)
+
+    response=webhook(client,transaction_id)
+
+    assert response.status_code==200
+    assert response.json()=={"processed":True,"status":"ACCEPTED"}
+    assert client.get(f"/transactions/{transaction_id}").json()["status"]=="ACCEPTED"
+
+
+def test_failed_webhook_rejects_transaction(client):
+    transaction_id=create_processing_transaction(client)
+
+    response=webhook(client,transaction_id,status="failed")
+
+    assert response.json()=={"processed":True,"status":"REJECTED"}
+
+
+def test_duplicate_webhook_is_ignored(client):
+    transaction_id=create_processing_transaction(client)
+    webhook(client,transaction_id,webhook_id="wh_dup")
+
+    second=webhook(client,transaction_id,webhook_id="wh_dup")
+
+    assert second.json()=={"processed":False,"status":"ACCEPTED"}
+
+
+def test_webhook_with_wrong_amount_is_not_applied(client):
+    transaction_id=create_processing_transaction(client)
+
+    response=webhook(client,transaction_id,amount=999)
+
+    assert response.json()=={"processed":False,"status":"PROCESSING"}
+    assert client.get(f"/transactions/{transaction_id}").json()["status"]=="PROCESSING"
+
+
+def test_webhook_for_unknown_transaction_returns_404(client):
+    assert webhook(client,"does-not-exist").status_code==404
+
+
+def test_webhook_with_unknown_status_returns_422(client):
+    transaction_id=create_processing_transaction(client)
+
+    assert webhook(client,transaction_id,status="refunded").status_code==422
+
+
+def test_redundant_webhook_with_new_id_is_accepted_without_changes(client):
+    transaction_id=create_processing_transaction(client)
+    webhook(client,transaction_id,webhook_id="wh_a")
+
+    response=webhook(client,transaction_id,webhook_id="wh_b")
+
+    assert response.json()=={"processed":True,"status":"ACCEPTED"}
+
+
+def test_contradicting_webhook_does_not_change_terminal_state(client):
+    transaction_id=create_processing_transaction(client)
+    webhook(client,transaction_id,webhook_id="wh_a",status="succeeded")
+
+    response=webhook(client,transaction_id,webhook_id="wh_b",status="failed")
+
+    assert response.json()=={"processed":False,"status":"ACCEPTED"}
