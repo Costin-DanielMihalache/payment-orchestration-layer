@@ -24,7 +24,7 @@ class TransactionRepository:
                                CREATE TABLE IF NOT EXISTS transactions
                                (
                                    transaction_id TEXT PRIMARY KEY,
-                                   amount REAL,
+                                   amount INTEGER NOT NULL,
                                    currency TEXT,
                                    status TEXT,
                                    created_at TEXT,
@@ -83,7 +83,9 @@ class TransactionRepository:
             return None
         return Transaction.from_row(
             transaction_id=row[0],
-            amount=row[1],
+            # int(): databases created before amount became INTEGER still
+            # hold floats (1050.0) - always hand back minor units as int
+            amount=int(row[1]),
             currency=row[2],
             status=Status(row[3]),
             created_at=datetime.fromisoformat(row[4]),
